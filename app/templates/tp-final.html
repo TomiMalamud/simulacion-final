@@ -4,11 +4,11 @@
   <h1 class="text-center">TP Final</h1>
   <form method="GET" action="/tp-final" id="simulation-form">
     <div
-      class="rounded border border-dark-subtle bg-secondary-subtle p-4 mt-5 container row"
+      class="rounded border border-dark-subtle bg-secondary-subtle p-4 mt-5 container"
     >
-      <div class="row align-items-end">
+      <div class="row align-items-end mb-3">
         <div class="col-md-4">
-          <div class="form-group mb-3">
+          <div class="form-group">
             <label for="start_row">Start Row</label>
             <input
               type="number"
@@ -16,12 +16,12 @@
               name="start_row"
               class="form-control"
               required
-              value="{{ request.args.get('start_row', '0') }}"
+              value="{{ current_params.start_row }}"
             />
           </div>
         </div>
         <div class="col-md-4">
-          <div class="form-group mb-3">
+          <div class="form-group">
             <label for="additional_rows">Additional Rows to show</label>
             <input
               type="number"
@@ -29,12 +29,12 @@
               name="additional_rows"
               class="form-control"
               required
-              value="{{ request.args.get('additional_rows', '100') }}"
+              value="{{ current_params.additional_rows }}"
             />
           </div>
         </div>
         <div class="col-md-4">
-          <div class="form-group mb-3">
+          <div class="form-group">
             <label for="total_rows">Total rows</label>
             <input
               type="number"
@@ -42,7 +42,65 @@
               name="total_rows"
               class="form-control"
               required
-              value="{{ request.args.get('total_rows', '100') }}"
+              value="{{ current_params.total_rows }}"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="row align-items-end mb-3">
+        <div class="col-md-3">
+          <div class="form-group">
+            <label for="arrival_time_min">Arrival Time Min</label>
+            <input
+              type="number"
+              step="0.1"
+              id="arrival_time_min"
+              name="arrival_time_min"
+              class="form-control"
+              required
+              value="{{ current_params.arrival_time_min }}"
+            />
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group">
+            <label for="arrival_time_max">Arrival Time Max</label>
+            <input
+              type="number"
+              step="0.1"
+              id="arrival_time_max"
+              name="arrival_time_max"
+              class="form-control"
+              required
+              value="{{ current_params.arrival_time_max }}"
+            />
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group">
+            <label for="silo_change_time">Silo Change Time</label>
+            <input
+              type="number"
+              step="0.01"
+              id="silo_change_time"
+              name="silo_change_time"
+              class="form-control"
+              required
+              value="{{ current_params.silo_change_time }}"
+            />
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group">
+            <label for="plant_consumption_rate">Plant Consumption Rate</label>
+            <input
+              type="number"
+              step="0.1"
+              id="plant_consumption_rate"
+              name="plant_consumption_rate"
+              class="form-control"
+              required
+              value="{{ current_params.plant_consumption_rate }}"
             />
           </div>
         </div>
@@ -66,7 +124,8 @@
       </div>
     </div>
   </form>
-{% if simulation_data %}
+
+  {% if simulation_data %}
   <table
     class="table text-center table-bordered position-absolute start-0 mt-4"
   >
@@ -147,7 +206,7 @@
         <td>{{ row.silo_4_flour }}</td>
         <td>{{ row.tube_state }}</td>
         <td>{{ row.tube_queue }}</td>
-        <td> {{ row.remaining_truck_load }} </td>
+        <td>{{ row.remaining_truck_load }}</td>
         <td>{{ row.tube_occupation_time }}</td>
         <td>{{ row.tube_occupation_percentage }} %</td>
         <td>{{ row.total_trucks }}</td>

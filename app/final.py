@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 from flask import Flask, Blueprint, render_template, request
 
 # Constants and configuration
@@ -102,7 +102,15 @@ class UnloadingArea:
 
 
 class Simulation:
-    def __init__(self):
+    def __init__(
+        self,
+        arrival_time_range=(5, 9),
+        silo_change_time=round(1 / 6, 2),
+        plant_consumption_rate=0.5,
+    ):
+        self.arrival_time_range = arrival_time_range
+        self.silo_change_time = silo_change_time
+        self.plant_consumption_rate = plant_consumption_rate
         self.clock = 0
         self.next_arrival = 0
         self.end_unloading = float("inf")
@@ -117,8 +125,8 @@ class Simulation:
         self.tube_occupation_start = 0
         self.total_tube_occupation_time = 0
         self.last_event_time = 0
-        self.total_trucks = 0 
-        self.max_queue = 0 
+        self.total_trucks = 0
+        self.max_queue = 0
         self.last_event_type = None
 
     def update_tube_occupation(self, current_time):
@@ -201,8 +209,8 @@ class Simulation:
     def handle_truck_arrival(self, event):
         rnd = random.random()
         time_between_arrivals = (
-            ARRIVAL_TIME_RANGE[0]
-            + (ARRIVAL_TIME_RANGE[1] - ARRIVAL_TIME_RANGE[0]) * rnd
+            self.arrival_time_range[0]
+            + (self.arrival_time_range[1] - self.arrival_time_range[0]) * rnd
         )
         self.next_arrival = self.clock + time_between_arrivals
 
@@ -249,7 +257,9 @@ class Simulation:
                 if silo.flour > 0 and silo.state != "Being filled":
                     silo.state = "Supplying Plant"
                     self.current_supplying_silo = i
-                    self.silo_emptying = self.clock + 1  # Set next emptying time when starting to supply
+                    self.silo_emptying = (
+                        self.clock + 1
+                    )  # Set next emptying time when starting to supply
                     break
 
         self.max_queue = max(self.max_queue, len(self.unloading_area.queue))
@@ -269,11 +279,13 @@ class Simulation:
             )
             if self.current_supplying_silo is not None:
                 self.silos[self.current_supplying_silo].state = "Supplying Plant"
-                self.silo_emptying = self.clock + 1  # Set next emptying time when starting to supply
+                self.silo_emptying = (
+                    self.clock + 1
+                )  # Set next emptying time when starting to supply
 
         if self.current_supplying_silo is not None:
             silo = self.silos[self.current_supplying_silo]
-            silo.empty(PLANT_CONSUMPTION_RATE)
+            silo.empty(self.plant_consumption_rate)
             if silo.flour == 0:
                 silo.state = "Free"
                 self.current_supplying_silo = None
@@ -285,7 +297,9 @@ class Simulation:
                         break
 
         if self.current_supplying_silo is not None:
-            self.silo_emptying = self.clock + 1  # Always set next emptying time if a silo is supplying
+            self.silo_emptying = (
+                self.clock + 1
+            )  # Always set next emptying time if a silo is supplying
         else:
             self.silo_emptying = float("inf")
 
@@ -318,7 +332,9 @@ class Simulation:
             event_type = event["type"]
 
         # Calculate silo_change_time
-        silo_change_time = round(SILO_CHANGE_TIME, 2) if event_type == "Change of Silo" else ""
+        silo_change_time = (
+            round(SILO_CHANGE_TIME, 2) if event_type == "Change of Silo" else ""
+        )
 
         return {
             "index": index,
@@ -360,10 +376,16 @@ class Simulation:
             "tube_queue": self.unloading_area.queue,
             "tube_state": self.unloading_area.state,
             "remaining_truck_load": (
-                round(self.unloading_area.remaining_truck_load, 2)
-                if isinstance(self.unloading_area.remaining_truck_load, (int, float))
+                (
+                    round(self.unloading_area.remaining_truck_load, 2)
+                    if isinstance(
+                        self.unloading_area.remaining_truck_load, (int, float)
+                    )
+                    else ""
+                )
+                if 0 < self.unloading_area.remaining_truck_load < 10
                 else ""
-            ) if 0 < self.unloading_area.remaining_truck_load < 10 else "",
+            ),
             **{
                 f"truck_{truck_id}_state": state
                 for truck_id, state in truck_states.items()
@@ -374,14 +396,13 @@ class Simulation:
             "total_trucks": self.total_trucks,
             "max_queue": self.max_queue,
             "silo_change_time": silo_change_time,
-
         }
 
 
-global_simulation = Simulation()
-
 app = Flask(__name__)
 final = Blueprint("final", __name__, template_folder="templates")
+
+global_simulation = None  # Initialize as None
 
 
 @final.route("/tp-final", methods=["GET"])
@@ -389,22 +410,35 @@ def tp_final():
     simulation_data = None
     max_trucks = 0
 
-    if request.args:
-        start_row = int(request.args.get("start_row", 0))
-        additional_rows = int(request.args.get("additional_rows", 100))
-        total_rows = int(request.args.get("total_rows", 100))
+    # Get parameters from query string, with defaults
+    arrival_time_min = float(request.args.get("arrival_time_min", 5))
+    arrival_time_max = float(request.args.get("arrival_time_max", 9))
+    silo_change_time = float(request.args.get("silo_change_time", round(1 / 6, 2)))
+    plant_consumption_rate = float(request.args.get("plant_consumption_rate", 0.5))
 
-        # Ensure we've simulated up to the required point
-        global_simulation.run_up_to(total_rows)
+    start_row = int(request.args.get("start_row", 0))
+    additional_rows = int(request.args.get("additional_rows", 100))
+    total_rows = int(request.args.get("total_rows", 100))
+
+    # Create a new simulation with user-defined parameters
+    simulation = Simulation(
+        arrival_time_range=(arrival_time_min, arrival_time_max),
+        silo_change_time=silo_change_time,
+        plant_consumption_rate=plant_consumption_rate,
+    )
+
+    if request.args:
+        # Run simulation up to the required point
+        simulation.run_up_to(total_rows)
 
         # Get the first row
-        first_row = global_simulation.get_data(0, 1, total_rows)
+        first_row = simulation.get_data(0, 1, total_rows)
 
         # Get the requested range of rows
-        middle_rows = global_simulation.get_data(start_row, additional_rows, total_rows)
+        middle_rows = simulation.get_data(start_row, additional_rows, total_rows)
 
         # Get the last row
-        last_row = global_simulation.get_data(total_rows - 1, 1, total_rows)
+        last_row = simulation.get_data(total_rows - 1, 1, total_rows)
 
         # Combine all rows
         simulation_data = first_row + middle_rows + last_row
@@ -416,12 +450,29 @@ def tp_final():
         simulation_data.sort(key=lambda x: x["index"])
 
         max_trucks = max(
-            len([k for k in row.keys() if k.startswith("truck_") and k.endswith("_state")])
+            len(
+                [
+                    k
+                    for k in row.keys()
+                    if k.startswith("truck_") and k.endswith("_state")
+                ]
+            )
             for row in simulation_data
         )
 
     return render_template(
-        "tp-final.html", simulation_data=simulation_data, max_trucks=max_trucks
+        "tp-final.html",
+        simulation_data=simulation_data,
+        max_trucks=max_trucks,
+        current_params={
+            "arrival_time_min": arrival_time_min,
+            "arrival_time_max": arrival_time_max,
+            "silo_change_time": silo_change_time,
+            "plant_consumption_rate": plant_consumption_rate,
+            "start_row": start_row,
+            "additional_rows": additional_rows,
+            "total_rows": total_rows,
+        },
     )
 
 
