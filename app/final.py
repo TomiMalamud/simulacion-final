@@ -249,10 +249,8 @@ class Simulation:
                 if silo.flour > 0 and silo.state != "Being filled":
                     silo.state = "Supplying Plant"
                     self.current_supplying_silo = i
+                    self.silo_emptying = self.clock + 1  # Set next emptying time when starting to supply
                     break
-
-        if any(s.flour > 0 for s in self.silos):
-            self.silo_emptying = self.clock + PLANT_CONSUMPTION_INTERVAL
 
         self.max_queue = max(self.max_queue, len(self.unloading_area.queue))
 
@@ -271,27 +269,23 @@ class Simulation:
             )
             if self.current_supplying_silo is not None:
                 self.silos[self.current_supplying_silo].state = "Supplying Plant"
+                self.silo_emptying = self.clock + 1  # Set next emptying time when starting to supply
 
         if self.current_supplying_silo is not None:
             silo = self.silos[self.current_supplying_silo]
             silo.empty(PLANT_CONSUMPTION_RATE)
             if silo.flour == 0:
                 silo.state = "Free"
-                self.current_supplying_silo = next(
-                    (
-                        i
-                        for i, s in enumerate(self.silos)
-                        if s.flour > 0 and s.state != "Being filled"
-                    ),
-                    None,
-                )
-                if self.current_supplying_silo is not None:
-                    self.silos[self.current_supplying_silo].state = "Supplying Plant"
+                self.current_supplying_silo = None
+                # Find the next silo to supply
+                for i, s in enumerate(self.silos):
+                    if s.flour > 0 and s.state != "Being filled":
+                        s.state = "Supplying Plant"
+                        self.current_supplying_silo = i
+                        break
 
-        if self.current_supplying_silo is not None or any(
-            s.flour > 0 for s in self.silos
-        ):
-            self.silo_emptying = self.clock + PLANT_CONSUMPTION_INTERVAL
+        if self.current_supplying_silo is not None:
+            self.silo_emptying = self.clock + 1  # Always set next emptying time if a silo is supplying
         else:
             self.silo_emptying = float("inf")
 
