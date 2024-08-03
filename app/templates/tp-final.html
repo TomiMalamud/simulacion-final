@@ -74,10 +74,10 @@
       <tr>
         <th rowspan="3">#</th>
         <th rowspan="3">Event</th>
-        <th rowspan="3">Clock (hour)</th>
+        <th rowspan="3">Clock (hours)</th>
         <th colspan="3">Truck Arrival</th>
         <th colspan="2">Truck Load</th>
-        <th colspan="2">End of Unloading</th>
+        <th colspan="3">End of Unloading</th>
         <th rowspan="3">Silo emptying</th>
         <th colspan="2">Silo 1</th>
         <th colspan="2">Silo 2</th>
@@ -99,6 +99,7 @@
         <th rowspan="2">Truck Load</th>
         <!-- Could be 10 or 12, equally probable -->
         <th rowspan="2">Unloading time</th>
+        <th rowspan="2">Silo Change time</th>
         <th rowspan="2">End of unloading</th>
         <th rowspan="2">State</th>
         <th rowspan="2">Amount of flour</th>
@@ -133,6 +134,7 @@
         <td>{{ row.rnd_load }}</td>
         <td>{{ row.truck_load }}</td>
         <td>{{ row.unloading_time }}</td>
+        <td>{{ row.silo_change_time }}</td>
         <td>{{ row.end_unloading }}</td>
         <td>{{ row.silo_emptying }}</td>
         <td>{{ row.silo_1_state }}</td>
