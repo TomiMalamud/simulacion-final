@@ -119,6 +119,7 @@ class Simulation:
         self.last_event_time = 0
         self.total_trucks = 0 
         self.max_queue = 0 
+        self.last_event_type = None
 
     def update_tube_occupation(self, current_time):
         if self.unloading_area.state == "Busy":
@@ -235,9 +236,11 @@ class Simulation:
         additional_time = self.unloading_area.finish_unloading(self.silos)
         if additional_time > 0:
             self.end_unloading = self.clock + additional_time
+            self.last_event_type = "Change of Silo"
         else:
             self.end_unloading = float("inf")
             self.total_trucks += 1
+            self.last_event_type = "End of Unloading"
 
         # Check if there's no silo currently supplying the plant
         if self.current_supplying_silo is None:
@@ -315,10 +318,17 @@ class Simulation:
             ),
             2,
         )
+        if self.last_event_type == "Change of Silo":
+            event_type = "Change of Silo"
+        else:
+            event_type = event["type"]
+
+        # Calculate silo_change_time
+        silo_change_time = round(SILO_CHANGE_TIME, 2) if event_type == "Change of Silo" else ""
 
         return {
             "index": index,
-            "event": event["type"],
+            "event": event_type,
             "clock": round(self.clock, 2),
             "rnd": (
                 round(event.get("rnd", ""), 2)
@@ -339,7 +349,7 @@ class Simulation:
             "truck_load": event.get("truck_load", ""),
             "unloading_time": event.get("unloading_time", ""),
             "end_unloading": (
-                round(self.end_unloading, 3)
+                round(self.end_unloading, 2)
                 if self.end_unloading != float("inf")
                 else ""
             ),
@@ -369,6 +379,8 @@ class Simulation:
             "tube_occupation_percentage": occupation_percentage,
             "total_trucks": self.total_trucks,
             "max_queue": self.max_queue,
+            "silo_change_time": silo_change_time,
+
         }
 
 
@@ -380,35 +392,39 @@ final = Blueprint("final", __name__, template_folder="templates")
 
 @final.route("/tp-final", methods=["GET"])
 def tp_final():
-    start_row = int(request.args.get("start_row", 0))
-    additional_rows = int(request.args.get("additional_rows", 100))
-    total_rows = int(request.args.get("total_rows", 10000))
+    simulation_data = None
+    max_trucks = 0
 
-    # Ensure we've simulated up to the required point
-    global_simulation.run_up_to(total_rows)
+    if request.args:
+        start_row = int(request.args.get("start_row", 0))
+        additional_rows = int(request.args.get("additional_rows", 100))
+        total_rows = int(request.args.get("total_rows", 100))
 
-    # Get the first row
-    first_row = global_simulation.get_data(0, 1, total_rows)
+        # Ensure we've simulated up to the required point
+        global_simulation.run_up_to(total_rows)
 
-    # Get the requested range of rows
-    middle_rows = global_simulation.get_data(start_row, additional_rows, total_rows)
+        # Get the first row
+        first_row = global_simulation.get_data(0, 1, total_rows)
 
-    # Get the last row
-    last_row = global_simulation.get_data(total_rows - 1, 1, total_rows)
+        # Get the requested range of rows
+        middle_rows = global_simulation.get_data(start_row, additional_rows, total_rows)
 
-    # Combine all rows
-    simulation_data = first_row + middle_rows + last_row
+        # Get the last row
+        last_row = global_simulation.get_data(total_rows - 1, 1, total_rows)
 
-    # Remove duplicate rows if any
-    simulation_data = [dict(t) for t in {tuple(d.items()) for d in simulation_data}]
+        # Combine all rows
+        simulation_data = first_row + middle_rows + last_row
 
-    # Sort the rows by index
-    simulation_data.sort(key=lambda x: x["index"])
+        # Remove duplicate rows if any
+        simulation_data = [dict(t) for t in {tuple(d.items()) for d in simulation_data}]
 
-    max_trucks = max(
-        len([k for k in row.keys() if k.startswith("truck_") and k.endswith("_state")])
-        for row in simulation_data
-    )
+        # Sort the rows by index
+        simulation_data.sort(key=lambda x: x["index"])
+
+        max_trucks = max(
+            len([k for k in row.keys() if k.startswith("truck_") and k.endswith("_state")])
+            for row in simulation_data
+        )
 
     return render_template(
         "tp-final.html", simulation_data=simulation_data, max_trucks=max_trucks
