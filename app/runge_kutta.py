@@ -1,5 +1,11 @@
-from flask import Blueprint, render_template, request
+import matplotlib
+matplotlib.use('Agg')
+
+from flask import Blueprint, render_template, request, send_file
 import numpy as np
+import matplotlib.pyplot as plt
+import io
+import base64
 
 ode_solver_bp = Blueprint('ode_solver', __name__)
 
@@ -29,34 +35,57 @@ def solve_ode(t_max, step_size):
         l4 = h * f(t + h, y + k3, dy + l3)
 
         results.append({
-            'yPrime2': f"{y_prime2:.4f}",
-            't': f"{t:.4f}",
-            'y': f"{y:.4f}",
-            'z': f"{dy:.4f}",
-            'k1': f"{k1:.4f}",
-            'l1': f"{l1:.4f}",
-            'k2': f"{k2:.4f}",
-            'l2': f"{l2:.4f}",
-            'k3': f"{k3:.4f}",
-            'l3': f"{l3:.4f}",
-            'k4': f"{k4:.4f}",
-            'l4': f"{l4:.4f}"
+            'yPrime2': y_prime2,
+            't': t,
+            'y': y,
+            'z': dy,
+            'k1': k1,
+            'l1': l1,
+            'k2': k2,
+            'l2': l2,
+            'k3': k3,
+            'l3': l3,
+            'k4': k4,
+            'l4': l4
         })
 
         y += (k1 + 2 * k2 + 2 * k3 + k4) / 6
         dy += (l1 + 2 * l2 + 2 * l3 + l4) / 6
         t += h
 
+        if t > 1:  
+            break
+
     return results
+
+def create_plot(results):
+    t_values = [result['t'] for result in results]
+    y_prime2_values = [result['yPrime2'] for result in results]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_values, y_prime2_values, label="y''(t)")
+    plt.xlabel('Time (t)')
+    plt.ylabel("y''(t)")
+    plt.title("ODE Solution: y''(t) over time")
+    plt.legend()
+    plt.grid(True)
+    plt.xlim(0, 1)
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    plot_url = base64.b64encode(img.getvalue()).decode()
+    plt.close()
+
+    return plot_url
 
 @ode_solver_bp.route('/runge-kutta', methods=['GET', 'POST'])
 def runge_kutta():
-    # Default values
     h = 0.001
-    max_t = 0.5
+    max_t = 1.0  
     first_10 = 10
     first_12 = 12
     results = None
+    plot_url = None
 
     if request.method == 'POST':
         h = float(request.form.get('h', h))
@@ -65,10 +94,12 @@ def runge_kutta():
         first_12 = float(request.form.get('first_12', first_12))
         
         results = solve_ode(max_t, h)
+        plot_url = create_plot(results)
 
     return render_template('runge-kutta.html', 
                            results=results, 
                            h=h, 
                            max_t=max_t, 
                            first_10=first_10, 
-                           first_12=first_12)
+                           first_12=first_12,
+                           plot_url=plot_url)

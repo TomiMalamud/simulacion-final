@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List
 from flask import Flask, Blueprint, render_template, request
 
-# Constants and configuration
+# Constantes y configuración
 SILO_CAPACITY = 20
 NUM_SILOS = 4
 ARRIVAL_TIME_RANGE = (5, 9)
@@ -18,7 +18,7 @@ class Truck:
     size: int
     unloading_time: float
     rnd_load: float
-    state: str = "Waiting"
+    state: str = "Esperando"
 
     @classmethod
     def generate(cls, truck_id):
@@ -31,7 +31,7 @@ class Truck:
 class Silo:
     def __init__(self):
         self.flour = 0
-        self.state = "Free"
+        self.state = "Libre"
 
     @property
     def is_full(self):
@@ -52,30 +52,30 @@ class Silo:
 
     def update_state(self):
         if self.flour == 0:
-            self.state = "Free"
+            self.state = "Libre"
         elif self.flour == SILO_CAPACITY:
-            self.state = "Full"
+            self.state = "Lleno"
         else:
             self.state = (
-                "Supplying Plant" if self.state == "Supplying Plant" else "Free"
+                "Surtiendo a la planta" if self.state == "Surtiendo a la planta" else "Libre"
             )
 
 
 class UnloadingArea:
     def __init__(self):
-        self.state = "Free"
+        self.state = "Libre"
         self.queue = []
         self.current_silo = None
         self.remaining_truck_load = 0
         self.current_truck = None
 
     def start_unloading(self, truck: Truck, silo: Silo):
-        self.state = "Busy"
+        self.state = "Ocupado"
         self.current_silo = silo
         self.remaining_truck_load = truck.size
-        silo.state = "Being filled"
+        silo.state = "Siendo rellenado"
         self.current_truck = truck
-        truck.state = "Unloading"
+        truck.state = "Descargando"
         return truck.unloading_time
 
     def finish_unloading(self, silos: List[Silo]):
@@ -83,7 +83,7 @@ class UnloadingArea:
             amount_filled = self.current_silo.fill(self.remaining_truck_load)
             self.remaining_truck_load -= amount_filled
             if self.remaining_truck_load > 0:
-                new_silo = next((s for s in silos if s.state == "Free"), None)
+                new_silo = next((s for s in silos if s.state == "Libre"), None)
                 if new_silo:
                     self.current_silo = new_silo
                     return SILO_CHANGE_TIME
@@ -93,11 +93,11 @@ class UnloadingArea:
 
         if self.queue:
             next_truck = self.queue.pop(0)
-            new_silo = next((s for s in silos if s.state == "Free"), None)
+            new_silo = next((s for s in silos if s.state == "Libre"), None)
             if new_silo:
                 return self.start_unloading(next_truck, new_silo)
 
-        self.state = "Free"
+        self.state = "Libre"
         return 0
 
 
@@ -130,7 +130,7 @@ class Simulation:
         self.last_event_type = None
 
     def update_tube_occupation(self, current_time):
-        if self.unloading_area.state == "Busy":
+        if self.unloading_area.state == "Ocupado":
             occupation_duration = current_time - self.last_event_time
             self.total_tube_occupation_time += occupation_duration
         self.last_event_time = current_time
@@ -138,7 +138,7 @@ class Simulation:
     def run_up_to(self, end_row: int) -> None:
         start_row = (
             self.last_simulated_row + 1
-        )  # Use last_simulated_row instead of len(self.simulation_data)
+        ) 
         for i in range(start_row, end_row):
             if i == 0:
                 self.initialize()
@@ -148,16 +148,16 @@ class Simulation:
             self.update_tube_occupation(event["time"])
             self.clock = event["time"]
 
-            if event["type"] == "Truck Arrival":
+            if event["type"] == "Llegada de camión":
                 self.handle_truck_arrival(event)
-            elif event["type"] == "End of Unloading":
+            elif event["type"] == "Fin de descarga":
                 self.handle_end_of_unloading()
-            elif event["type"] == "Silo Emptying":
+            elif event["type"] == "Vaciado de Silo":
                 self.handle_silo_emptying()
 
             self.update_silo_states()
             self.simulation_data.append(self.create_row(i, event))
-            self.last_simulated_row = i  # Update last_simulated_row
+            self.last_simulated_row = i 
 
     def get_data(
         self, start_row: int, additional_rows: int, total_rows: int
@@ -177,11 +177,11 @@ class Simulation:
             event = self.get_next_event()
             self.clock = event["time"]
 
-            if event["type"] == "Truck Arrival":
+            if event["type"] == "Llegada de camión":
                 self.handle_truck_arrival(event, simulation_data)
-            elif event["type"] == "End of Unloading":
+            elif event["type"] == "Fin de descarga":
                 self.handle_end_of_unloading(simulation_data)
-            elif event["type"] == "Silo Emptying":
+            elif event["type"] == "Vaciado de Silo":
                 self.handle_silo_emptying(simulation_data)
 
             self.update_silo_states()
@@ -200,9 +200,9 @@ class Simulation:
 
     def get_next_event(self):
         events = [
-            {"type": "Truck Arrival", "time": self.next_arrival},
-            {"type": "End of Unloading", "time": self.end_unloading},
-            {"type": "Silo Emptying", "time": self.silo_emptying},
+            {"type": "Llegada de camión", "time": self.next_arrival},
+            {"type": "Fin de descarga", "time": self.end_unloading},
+            {"type": "Vaciado de Silo", "time": self.silo_emptying},
         ]
         return min(events, key=lambda x: x["time"])
 
@@ -218,8 +218,8 @@ class Simulation:
         self.trucks[self.truck_id_counter] = truck
         self.truck_id_counter += 1
 
-        if self.unloading_area.state == "Free":
-            empty_silo = next((s for s in self.silos if s.state == "Free"), None)
+        if self.unloading_area.state == "Libre":
+            empty_silo = next((s for s in self.silos if s.state == "Libre"), None)
             if empty_silo:
                 unloading_time = self.unloading_area.start_unloading(truck, empty_silo)
                 self.end_unloading = self.clock + unloading_time
@@ -244,22 +244,20 @@ class Simulation:
         additional_time = self.unloading_area.finish_unloading(self.silos)
         if additional_time > 0:
             self.end_unloading = self.clock + additional_time
-            self.last_event_type = "Change of Silo"
+            self.last_event_type = "Cambio de Silo"
         else:
             self.end_unloading = float("inf")
             self.total_trucks += 1
-            self.last_event_type = "End of Unloading"
-
-        # Check if there's no silo currently supplying the plant
-        if self.current_supplying_silo is None:
-            # Find the first non-empty silo that's not being filled
+            self.last_event_type = "Fin de descarga"
+    
+        if self.current_supplying_silo is None:        
             for i, silo in enumerate(self.silos):
-                if silo.flour > 0 and silo.state != "Being filled":
-                    silo.state = "Supplying Plant"
+                if silo.flour > 0 and silo.state != "Siendo rellenado":
+                    silo.state = "Surtiendo a la planta"
                     self.current_supplying_silo = i
                     self.silo_emptying = (
                         self.clock + 1
-                    )  # Set next emptying time when starting to supply
+                    )
                     break
 
         self.max_queue = max(self.max_queue, len(self.unloading_area.queue))
@@ -273,33 +271,32 @@ class Simulation:
                 (
                     i
                     for i, s in enumerate(self.silos)
-                    if s.flour > 0 and s.state != "Being filled"
+                    if s.flour > 0 and s.state != "Siendo rellenado"
                 ),
                 None,
             )
             if self.current_supplying_silo is not None:
-                self.silos[self.current_supplying_silo].state = "Supplying Plant"
+                self.silos[self.current_supplying_silo].state = "Surtiendo a la planta"
                 self.silo_emptying = (
                     self.clock + 1
-                )  # Set next emptying time when starting to supply
+                )  
 
         if self.current_supplying_silo is not None:
             silo = self.silos[self.current_supplying_silo]
             silo.empty(self.plant_consumption_rate)
             if silo.flour == 0:
-                silo.state = "Free"
-                self.current_supplying_silo = None
-                # Find the next silo to supply
+                silo.state = "Libre"
+                self.current_supplying_silo = None                
                 for i, s in enumerate(self.silos):
-                    if s.flour > 0 and s.state != "Being filled":
-                        s.state = "Supplying Plant"
+                    if s.flour > 0 and s.state != "Siendo rellenado":
+                        s.state = "Surtiendo a la planta"
                         self.current_supplying_silo = i
                         break
 
         if self.current_supplying_silo is not None:
             self.silo_emptying = (
                 self.clock + 1
-            )  # Always set next emptying time if a silo is supplying
+            )
         else:
             self.silo_emptying = float("inf")
 
@@ -307,9 +304,9 @@ class Simulation:
         for i, silo in enumerate(self.silos):
             if i != self.current_supplying_silo:
                 if silo.flour > 0 and silo.state not in [
-                    "Being filled",
-                    "Full",
-                    "Supplying Plant",
+                    "Siendo rellenado",
+                    "Lleno",
+                    "Surtiendo a la planta",
                 ]:
                     silo.update_state()
 
@@ -326,14 +323,13 @@ class Simulation:
             ),
             2,
         )
-        if self.last_event_type == "Change of Silo":
-            event_type = "Change of Silo"
+        if self.last_event_type == "Cambio de Silo":
+            event_type = "Cambio de Silo"
         else:
             event_type = event["type"]
-
-        # Calculate silo_change_time
+        
         silo_change_time = (
-            round(SILO_CHANGE_TIME, 2) if event_type == "Change of Silo" else ""
+            round(SILO_CHANGE_TIME, 2) if event_type == "Cambio de Silo" else ""
         )
 
         return {
@@ -402,7 +398,7 @@ class Simulation:
 app = Flask(__name__)
 final = Blueprint("final", __name__, template_folder="templates")
 
-global_simulation = None  # Initialize as None
+global_simulation = None  
 
 
 @final.route("/tp-final", methods=["GET"])
@@ -410,7 +406,6 @@ def tp_final():
     simulation_data = None
     max_trucks = 0
 
-    # Get parameters from query string, with defaults
     arrival_time_min = float(request.args.get("arrival_time_min", 5))
     arrival_time_max = float(request.args.get("arrival_time_max", 9))
     silo_change_time = float(request.args.get("silo_change_time", round(1 / 6, 2)))
@@ -420,33 +415,20 @@ def tp_final():
     additional_rows = int(request.args.get("additional_rows", 100))
     total_rows = int(request.args.get("total_rows", 100))
 
-    # Create a new simulation with user-defined parameters
     simulation = Simulation(
         arrival_time_range=(arrival_time_min, arrival_time_max),
         silo_change_time=silo_change_time,
         plant_consumption_rate=plant_consumption_rate,
     )
 
-    if request.args:
-        # Run simulation up to the required point
-        simulation.run_up_to(total_rows)
+    if request.args:        
 
-        # Get the first row
-        first_row = simulation.get_data(0, 1, total_rows)
-
-        # Get the requested range of rows
+        simulation.run_up_to(total_rows)        
+        first_row = simulation.get_data(0, 1, total_rows)        
         middle_rows = simulation.get_data(start_row, additional_rows, total_rows)
-
-        # Get the last row
         last_row = simulation.get_data(total_rows - 1, 1, total_rows)
-
-        # Combine all rows
         simulation_data = first_row + middle_rows + last_row
-
-        # Remove duplicate rows if any
         simulation_data = [dict(t) for t in {tuple(d.items()) for d in simulation_data}]
-
-        # Sort the rows by index
         simulation_data.sort(key=lambda x: x["index"])
 
         max_trucks = max(
