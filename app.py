@@ -1,11 +1,11 @@
 from flask import Flask, render_template
 from app.final import final
-from app.runge_kutta import ode_solver_bp
+from app.runge_kutta import runge_kutta_bp
 
 app = Flask(__name__, template_folder="app/templates", static_folder="app/static")
 
 app.register_blueprint(final)
-app.register_blueprint(ode_solver_bp)
+app.register_blueprint(runge_kutta_bp)
 
 @app.route("/")
 def index():

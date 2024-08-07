@@ -55,7 +55,7 @@
                     {% set first_10_found = namespace(value=false) %}
                     {% set first_12_found = namespace(value=false) %}
                     {% for row in results %}
-                        {% set y_value = row.yPrime2|float %}
+                        {% set y_value = row.yDerivadaSegunda|float %}
                         {% if not first_10_found.value and y_value >= first_10|float %}
                             {% set first_10_found.value = true %}
                             <tr class="table-warning">
@@ -65,7 +65,7 @@
                         {% else %}
                             <tr>
                         {% endif %}
-                    <td>{{ row.yPrime2 }}</td>
+                    <td>{{ row.yDerivadaSegunda }}</td>
                     <td>{{ row.t }}</td>
                     <td>{{ row.y }}</td>
                     <td>{{ row.z }}</td>

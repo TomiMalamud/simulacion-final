@@ -57,7 +57,7 @@ class Silo:
             self.state = "Lleno"
         else:
             self.state = (
-                "Surtiendo a la planta" if self.state == "Surtiendo a la planta" else "Libre"
+                "Surtiendo Planta" if self.state == "Surtiendo Planta" else "Libre"
             )
 
 
@@ -253,7 +253,7 @@ class Simulation:
         if self.current_supplying_silo is None:        
             for i, silo in enumerate(self.silos):
                 if silo.flour > 0 and silo.state != "Siendo rellenado":
-                    silo.state = "Surtiendo a la planta"
+                    silo.state = "Surtiendo Planta"
                     self.current_supplying_silo = i
                     self.silo_emptying = (
                         self.clock + 1
@@ -276,7 +276,7 @@ class Simulation:
                 None,
             )
             if self.current_supplying_silo is not None:
-                self.silos[self.current_supplying_silo].state = "Surtiendo a la planta"
+                self.silos[self.current_supplying_silo].state = "Surtiendo Planta"
                 self.silo_emptying = (
                     self.clock + 1
                 )  
@@ -289,7 +289,7 @@ class Simulation:
                 self.current_supplying_silo = None                
                 for i, s in enumerate(self.silos):
                     if s.flour > 0 and s.state != "Siendo rellenado":
-                        s.state = "Surtiendo a la planta"
+                        s.state = "Surtiendo Planta"
                         self.current_supplying_silo = i
                         break
 
@@ -306,7 +306,7 @@ class Simulation:
                 if silo.flour > 0 and silo.state not in [
                     "Siendo rellenado",
                     "Lleno",
-                    "Surtiendo a la planta",
+                    "Surtiendo Planta",
                 ]:
                     silo.update_state()
 
