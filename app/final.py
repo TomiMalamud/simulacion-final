@@ -408,7 +408,7 @@ class Simulation:
             "tube_occupation_time": occupation_time,
             "tube_occupation_percentage": occupation_percentage,
             "total_trucks": self.total_trucks,
-            "max_queue": self.max_queue,
+            "max_queue": self.max_queue if (len(self.unloading_area.queue) > 0 and self.max_queue >0) else 0,
             "silo_change_time": silo_change_time,
         }
 
