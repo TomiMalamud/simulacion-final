@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 from flask import Flask, Blueprint, render_template, request
 
 # Constantes y configuración
@@ -10,13 +10,13 @@ ARRIVAL_TIME_RANGE = (5, 9)
 SILO_CHANGE_TIME = 1 / 6
 PLANT_CONSUMPTION_RATE = 0.5
 PLANT_CONSUMPTION_INTERVAL = 1
+UNLOADING_TIMES = {2: 0.205, 4: 0.309, 6: 0.361, 8: 0.393, 10: 0.414, 12: 0.43}
 
 
 @dataclass
 class Truck:
     id: int
     size: int
-    unloading_time: float
     rnd_load: float
     state: str = "Esperando"
     load: int = 0
@@ -25,8 +25,7 @@ class Truck:
     def generate(cls, truck_id):
         rnd_load = random.random()
         truck_load = 10 if rnd_load < 0.5 else 12
-        unloading_time = 0.4140 if truck_load == 10 else 0.4300
-        return cls(truck_id, truck_load, unloading_time, rnd_load, load=truck_load)  
+        return cls(truck_id, truck_load, rnd_load, load=truck_load)
 
 
 class Silo:
@@ -70,16 +69,32 @@ class UnloadingArea:
         self.remaining_truck_load = 0
         self.current_truck = None
 
-    def start_unloading(self, truck: Truck, silo: Silo):
+    def calculate_unloading_time(self, load: int) -> float:
+        return UNLOADING_TIMES.get(load, 0)
+
+    def start_unloading(self, truck: Truck, silo: Silo) -> Dict[str, float]:
         self.state = "Ocupado"
         self.current_silo = silo
         self.remaining_truck_load = truck.load
         silo.state = "Siendo rellenado"
         self.current_truck = truck
         truck.state = "Descargando"
-        return truck.unloading_time
 
-    def finish_unloading(self, silos: List[Silo]):
+        available_capacity = SILO_CAPACITY - silo.flour
+        unload_amount = min(available_capacity, self.remaining_truck_load)
+        unloading_time = self.calculate_unloading_time(unload_amount)
+
+        return {"unloading_time": unloading_time, "unload_amount": unload_amount}
+
+    def change_silo(self, new_silo: Silo) -> Dict[str, float]:
+        self.current_silo = new_silo
+        new_silo.state = "Siendo rellenado"
+        unload_amount = min(SILO_CAPACITY, self.remaining_truck_load)
+        unloading_time = self.calculate_unloading_time(unload_amount)
+
+        return {"unloading_time": unloading_time, "unload_amount": unload_amount}
+
+    def finish_unloading(self, silos: List[Silo]) -> float:
         if self.current_silo:
             amount_filled = self.current_silo.fill(self.remaining_truck_load)
             self.remaining_truck_load -= amount_filled
@@ -87,7 +102,6 @@ class UnloadingArea:
             if self.remaining_truck_load > 0:
                 new_silo = next((s for s in silos if s.state == "Libre"), None)
                 if new_silo:
-                    self.current_silo = new_silo
                     return SILO_CHANGE_TIME
             self.current_truck.state = "-"
             self.current_truck = None
@@ -219,22 +233,38 @@ class Simulation:
         if self.unloading_area.state == "Libre":
             self.start_next_unloading()
 
-        event.update(
-            {
-                "rnd": rnd,
-                "time_between_arrivals": time_between_arrivals,
-                "truck_load": truck.size,
-                "unloading_time": truck.unloading_time,
-                "rnd_load": truck.rnd_load,
-                "truck_id": truck.id,
-            }
-        )
+        event.update({
+            "rnd": rnd,
+            "time_between_arrivals": time_between_arrivals,
+            "rnd_load": truck.rnd_load,
+            "truck_load": truck.size,
+        })
 
+    def start_next_unloading(self):
+        if self.unloading_area.queue:
+            empty_silo = next((s for s in self.silos if s.state == "Libre"), None)
+            if empty_silo:
+                next_truck = self.unloading_area.queue.pop(0)
+                unloading_info = self.unloading_area.start_unloading(next_truck, empty_silo)
+                self.end_unloading = self.clock + unloading_info["unloading_time"]
+
+    def check_and_start_filling(self):
+        if self.unloading_area.state == "Libre" and self.unloading_area.queue:
+            empty_silo = next((s for s in self.silos if s.state == "Libre"), None)
+            if empty_silo:
+                next_truck = self.unloading_area.queue.pop(0)
+                unloading_info = self.unloading_area.start_unloading(next_truck, empty_silo)
+                self.end_unloading = self.clock + unloading_info["unloading_time"]
 
     def handle_end_of_unloading(self):
         additional_time = self.unloading_area.finish_unloading(self.silos)
         if additional_time > 0:
-            self.end_unloading = self.clock + additional_time
+            new_silo = next((s for s in self.silos if s.state == "Libre"), None)
+            if new_silo:
+                unloading_info = self.unloading_area.change_silo(new_silo)
+                self.end_unloading = self.clock + additional_time + unloading_info["unloading_time"]
+            else:
+                self.end_unloading = float("inf")
             self.last_event_type = "Cambio de Silo"
         else:
             self.end_unloading = float("inf")
@@ -292,21 +322,6 @@ class Simulation:
             self.silo_emptying = self.clock + 1
         else:
             self.silo_emptying = float("inf")
-    def check_and_start_filling(self):
-        if self.unloading_area.state == "Libre" and self.unloading_area.queue:
-            empty_silo = next((s for s in self.silos if s.state == "Libre"), None)
-            if empty_silo:
-                next_truck = self.unloading_area.queue.pop(0)
-                unloading_time = self.unloading_area.start_unloading(next_truck, empty_silo)
-                self.end_unloading = self.clock + unloading_time
-
-    def start_next_unloading(self):
-        if self.unloading_area.queue:
-            empty_silo = next((s for s in self.silos if s.state == "Libre"), None)
-            if empty_silo:
-                next_truck = self.unloading_area.queue.pop(0)
-                unloading_time = self.unloading_area.start_unloading(next_truck, empty_silo)
-                self.end_unloading = self.clock + unloading_time
 
     def update_silo_states(self):
         for i, silo in enumerate(self.silos):
